@@ -21,7 +21,7 @@ If you have an issue with this script, please open an issue on github for it
 
 
 Script created to connect to the Mission Control API, pull the current list of
-available packages, and minimumally reformat the output to something easily
+available packages, and minimally reformat the output to something easily
 grep'able
 
 Doc reference for the Mission Control API
