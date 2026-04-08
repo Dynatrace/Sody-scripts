@@ -19,6 +19,6 @@ THIS SCRIPT IS NOT OFFICIALLY SUPPORTED BY DYNATRACE
 If you have an issue with this script, please open an issue on github for it
 
 
-script for protecting the Managed Cluster services from OOM harvesting on host with either not enough memory or too many other third party packages consuming memory
+script for protecting the Managed Cluster services from OOM harvesting on hosts with either not enough memory or too many other third party packages consuming memory
 
 
