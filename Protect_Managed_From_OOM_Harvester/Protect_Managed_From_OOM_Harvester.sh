@@ -1,6 +1,6 @@
 #!/bin/bash
 ###
-# v0.13.3.2026-04-08.13.13.13
+# v0.14.1.2026-04-09.13.13.13
 ###
 
 ###
@@ -26,7 +26,11 @@
 ###
 
 ###
-# script to protect Managed Cluster services from OOM harvesting
+# script to protect Managed Cluster services from OOM harvesting.
+# starting with Managed v1.332 this can also be added to /etc/dynatrace.conf to
+# be preserved across upgrades.  Adding detection of version and updating to
+# preserve across upgrades if the version is high enough, and posting a notice
+# if the version is not yet high enough
 ###
 
 ###
@@ -43,6 +47,15 @@ if [ $(id -u) -gt 0 ]
 ###
 export updated_something=false
 export $(grep ^PRODUCT_PATH /etc/dynatrace.conf | sed s'/ //g')
+export $(grep ^PRODUCT_VERSION /etc/dynatrace.conf | sed 's/ //g')
+export major=$(echo ${PRODUCT_VERSION} | awk -F . '{print $2}')
+if [ ${major} -ge 332 ]
+  then
+    export preservable=true
+  else
+    export preservable=false
+  fi
+
 
 ###
 # check/configure the service definitions
@@ -84,3 +97,27 @@ for pid in $(ps -ef | grep ${PRODUCT_PATH} | grep -v grep | awk '{print $2}')
   do
     echo -1000 >/proc/${pid}/oom_score_adj 
   done
+
+###
+# if the Managed version is v1.332 or greater, set this to be preserved across
+# upgrades; else post notice that preservation across upgrades is not yet
+# possible
+###
+
+if [ ${preservable} == false ]
+  then
+    echo This cluster version is not new enough to preserve the setting across upgrade/reconfigure opertions.
+    echo After each such operation, this will need to be reapplied.
+  fi  
+
+if [ ${preservable} == true ]
+  then
+    export $(grep ^SYSTEMD_PROP_2 /etc/dynatrace.conf | sed 's/ //g')
+    if [ "${SYSTEMD_PROP_2}" == "OOMScoreAdjust=-1000" ]
+      then
+        echo preserved setting already present on this host
+      else
+        sed -i 's/SYSTEMD_PROP_2.*/SYSTEMD_PROP_2 = OOMScoreAdjust=-1000/g' /etc/dynatrace.conf
+        echo preserved setting added to this host
+      fi
+  fi
