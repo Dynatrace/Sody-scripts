@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# v1.2.2026.0707.1849
 ###
 # script to visually simulate cluster data distribution and recovery from lost nodes including the triplicate replication
 # mostly for fun, but also useful for illustration purposes
@@ -42,6 +42,9 @@ for param in "$@"
         ;;
       --source=*)
         export source_file=${param#*=}
+        #echo source_file == ${source_file}
+        export source_file=${source_file/#\~/$HOME}
+        #echo source_file == ${source_file}
         ;;
       --surviving-nodes=*)
         export surviving_nodes=${param#*=}
@@ -71,13 +74,13 @@ if [ "${surviving_nodes}" -gt "${start_nodes}" ]
     exit 22
   fi
 
-mkdir -p ${crunching_base}/indexed_words ${crunching_base}/reconstructed
+mkdir -p ${crunching_base}/indexed_words ${crunching_base}/reconstructed ${crunching_base}/quorum
 
 export ncount=0
 while true
   do
     export ncount=$((ncount+1))
-    mkdir ${crunching_base}/node${ncount}
+    mkdir -p ${crunching_base}/node${ncount}
     if [ ${ncount} -eq ${start_nodes} ]
       then
         break
@@ -107,30 +110,47 @@ for iw in ${crunching_base}/indexed_words/*
 for sn in $(shuf -i 1-${start_nodes} -n ${surviving_nodes})
   do
     cp -pf ${crunching_base}/node${sn}/* ${crunching_base}/reconstructed/
+    mkdir -p ${crunching_base}/quorum/${sn}
+    cp -pf ${crunching_base}/node${sn}/* ${crunching_base}/quorum/${sn}/
   done
 
 ###
 # show the comparative results
 ###
 
-echo -e "\n\n\tThis is the original data, as formated by the node distribution, for comparison\n"
+echo -e "\n\n\tThis is the original data, as formatted by the node distribution, for comparison\n"
 
 for file in $(ls ${crunching_base}/indexed_words/ | sort -h)
   do
     echo -e "$(cat ${crunching_base}/indexed_words/${file}) \c" | tee -a ${crunching_base}/rebuild_all.txt
   done
 
-echo -e "\n\n\tThis is the reconstructed data with the loss of $((start_nodes - surviving_nodes)) nodes\n"
+echo -e "\n\n\tThis is the reconstructed data with the loss of $((start_nodes - surviving_nodes)) out of ${start_nodes} nodes\n"
 for file in $(ls ${crunching_base}/reconstructed/ | sort -h)
   do
     echo -e "$(cat ${crunching_base}/reconstructed/${file}) \c" | tee -a ${crunching_base}/rebuild_surviving.txt
   done
+
+echo -e "\n\n\tThis is the quorum validation required data with the loss of $((start_nodes - surviving_nodes)) out of ${start_nodes} nodes\n"
+for file in $(ls ${crunching_base}/quorum/*/ | grep -v "${crunching_base}/quorum/.*/:" | sort -hu | grep .)
+  do
+    if [ $(ls ${crunching_base}/quorum/*/${file} | grep -c .) -gt 1 ]
+      then
+        echo -e "$(cat ${crunching_base}/reconstructed/${file}) \c" | tee -a ${crunching_base}/rebuild_quorum.txt
+      fi
+  done
+
+
+
+
 echo
 echo
 (
   cd ${crunching_base}/
-  md5sum rebuild_*.txt
+  md5sum rebuild_{all,surviving,quorum}.txt
 )
+echo
+echo Please note, this does NOT take into account rack awareness or PHA\; this is only following the normal HA cluster replication.
 echo -e "\n\n"
 ###
 # clean up
